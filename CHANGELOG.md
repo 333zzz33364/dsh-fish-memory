@@ -2,6 +2,19 @@
 
 > 版本号：改一次末位 +1，末位满 10 进位。
 
+## 1.1.7 — 2026-10-20
+
+**修「漏依赖」：两行裸 import 会让整条插件不激活（别人机器上表现为页面 404）**
+
+- 🔴 症状：装到没装 `@deepseek-ai/dsh-tools` / `@deepseek-ai/dsh-llm` 的机器上，
+  插件 `failed to import` → 不激活 → **DSH 把 bundle 条目摘掉** → 面板 404。
+  根因：这两行是**裸 import**，而 `package.json` 里一个都没声明。
+- ✅ 改成跟 bili 插件同一套做法：`lib/hostdeps.mjs` 先**从宿主那棵树**取 →
+  取不到用自己依赖 → 再取不到用**本地等价实现**（`defineTool` 原样返回、`createUserMessage` 拿 `randomUUID` 拼）。
+  这样任何机器上都**能加载**，功能按能拿到的降级，不再整条挂掉。
+- ✅ `package.json` 补了 `peerDependencies`（两个都是 `optional: true`）——至少不再"漏"。
+- ✅ 从哪儿取到的会写进 `diag.log`（`hostdeps: …`），以后降级了一看就知道。
+
 ## 1.1.6
 
 ### 修：说的是一件事，想起来的却是另一件事
