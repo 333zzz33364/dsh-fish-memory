@@ -1,4 +1,4 @@
-name: Permanent purge regression
+name: Atomic memory write regression
 
 on:
   pull_request:
@@ -37,4 +37,4 @@ jobs:
         shell: bash
         run: |
           node -p "'Runtime: ' + process.version + ' ' + process.platform + '/' + process.arch"
-          node --test tests/purge-generation.test.mjs
+          node --test tests/atomic-file.test.mjs tests/atomic-write.test.mjs
