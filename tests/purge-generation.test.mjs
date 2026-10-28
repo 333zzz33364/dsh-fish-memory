@@ -157,7 +157,7 @@ test('epoch on disk rejects work retained by an older plugin instance', async ()
   assert.deepEqual(disk(sid).deleted, [])
 })
 
-test('explicit copy adopts the destination epoch, not the source epoch', async () => {
+test('explicit copy adopts the destination epoch and only adds what is missing', async () => {
   store('copy-from', ['a'], ['trash'])
   store('copy-to', ['b'], ['trash'])
   await h.post('/delete', { session: 'copy-from', action: 'purgeall' })
@@ -165,8 +165,13 @@ test('explicit copy adopts the destination epoch, not the source epoch', async (
   const epoch = disk('copy-to').purgeEpoch
   const result = await h.post('/copy-to', { session: 'copy-from', to: 'copy-to' })
   assert.equal(result.ok, true)
-  assert.ok(disk('copy-to').memories.some(m => m.id === 'a'))
-  assert.equal(disk('copy-to').purgeEpoch, epoch)
+  const 到 = disk('copy-to')
+  // ⭐ 1.3.7：复制是「并进去」——目标原来那条得留着
+  assert.ok(到.memories.some(m => m.id === 'b'), '目标会话原有的记忆被覆盖了')
+  // 来源那条按内容并进来（id 是新的，两边不会再撞）
+  assert.ok(到.memories.some(m => m.text === memory('a').text), '来源那条没加进来')
+  assert.ok(到.memories.some(m => m.id === 'a'), '来源那条该沿用原来的 id（那边没有同 id）')
+  assert.equal(到.purgeEpoch, epoch)
 })
 
 test('a corrupt post-purge file fails closed instead of reviving a legacy snapshot', async () => {
