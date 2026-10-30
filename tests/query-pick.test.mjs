@@ -80,3 +80,129 @@ test('借上文有上限，也不会重复拼同一句', () => {
   assert.ok(拼.length <= 60)
   assert.equal((拼.match(/推/g) || []).length, 1)
 })
+
+// ⭐ 1.4.4：线索不能是宿主/插件塞进来的东西 —— 以前靠文本白名单，
+//   宿主换个措辞（`Approval prompts` → `Approval policy: ask`）就漏，
+//   插件自己 render 的列表项（`- 3 天前（10-27）：…`）也漏，全被当成「她说的那句话」。
+test('审批策略换成 ask 那句，也要剥干净', () => {
+  const 原 = 'Current runtime context. 开头那句' + 换行 + 换行
+    + 'Approval policy: ask. Operations that require approval may ask through the configured answerers.'
+  assert.equal(模.清掉注入上下文(原), '')
+})
+
+test('「Elapsed since」那行也是运行环境，一起剥', () => {
+  const 原 = 'Time sampled while preparing turn 1, step 1: 2026-10-30T19:00:00+08:00' + 换行
+    + 'Browser time zone for this request: Asia/Shanghai.' + 换行
+    + 'Elapsed since the preceding step message: 5m 39s.'
+  assert.equal(模.清掉注入上下文(原), '')
+})
+
+test('记忆提醒后面那种「3 天前（10-27）：…」列表项，也要剥（以前只认昨天/前天/日期）', () => {
+  const 原 = '【你记得的事】' + 换行 + '下面是你们过去真实发生过的事。' + 换行 + 换行
+    + '- 昨天 16:10：某条' + 换行
+    + '- 3 天前（10-27）：提交代码时不许手写作者身份' + 换行
+    + '- 一直：她这一阵学会了做蛋炒饭'
+  assert.equal(模.清掉注入上下文(原), '')
+})
+
+test('方块后面接着是真话时，真话要留下', () => {
+  const 原 = '【你记得的事】' + 换行 + '下面是你们过去真实发生过的事。' + 换行 + 换行
+    + '- 3 天前（10-27）：某条记忆' + 换行
+    + '宝宝我想吃火锅'
+  assert.equal(模.清掉注入上下文(原), '宝宝我想吃火锅')
+})
+
+// ⭐ 1.4.4：按 source.kind 认「谁在说话」，而不是猜文本
+const 事件 = (类型, 来源, 文字, 时间) => ({
+  type: 'user/message',
+  time: 时间 || 0,
+  data: { role: 'user', source: { kind: 来源 }, content: [{ type: 'text', text: 文字 }] },
+})
+
+test('运行环境那条整条跳过，取前面真说的那句', () => {
+  const ev = [
+    事件('user/message', 'user', '你在吗'),
+    事件('user/message', 'runtime-context', 'Current runtime context. This snapshot supersedes earlier runtime-context snapshots.Approval policy: ask.'),
+  ]
+  assert.equal(模.挑这一轮的真话(ev), '你在吗')
+})
+
+test('插件替她开口的那种（speak-up / her-words）不算她说的', () => {
+  const ev = [
+    事件('user/message', 'speak-up', '该去找他聊天了。'),
+    事件('user/message', 'user', '我回来了'),
+    事件('user/message', 'speak-up', 'Lucky！骰子骰中了，可以去找他聊天了'),
+  ]
+  assert.equal(模.挑这一轮的真话(ev), '我回来了')
+})
+
+test('时间那条 / 技能目录那条也跳过', () => {
+  const ev = [
+    事件('user/message', 'user', '帮我看看这个 bug'),
+    事件('user/message', 'time-context', 'Time sampled while preparing turn 1, step 1: …'),
+    事件('user/message', 'skill-catalog', '<system-reminder> 技能目录变了'),
+  ]
+  assert.equal(模.挑这一轮的真话(ev), '帮我看看这个 bug')
+})
+
+test('没有 source 的老消息，认不出来就不拦', () => {
+  const ev = [{ type: 'user/message', data: { role: 'user', content: [{ type: 'text', text: '宝宝早' }] } }]
+  assert.equal(模.挑这一轮的真话(ev), '宝宝早')
+})
+
+// ⚠ 黑名单而不是白名单：第三方 IM 桥用的 kind 我们不认识，
+//   要是把它们当「不是人话」跳过，那些用户就永远检索不到记忆了。
+test('不认识的来源当人话，不拦', () => {
+  const ev = [事件('user/message', 'im-connect', '宝贝我到家了')]
+  assert.equal(模.挑这一轮的真话(ev), '宝贝我到家了')
+})
+
+test('plugin: 开头那种是插件自己塞的，跳过', () => {
+  const ev = [
+    事件('user/message', 'user', '真实的一句'),
+    事件('user/message', 'plugin:meow-memory', '[meow-memory-dream] 记忆整理任务'),
+  ]
+  assert.equal(模.挑这一轮的真话(ev), '真实的一句')
+})
+
+test('全是上下文、一句真话都没有 → 返回空（上层就不注入）', () => {
+  const ev = [事件('user/message', 'runtime-context', 'Current runtime context. …')]
+  assert.equal(模.挑这一轮的真话(ev), '')
+})
+
+test('夹在一条里的：真话 + 运行环境 → 取出来的是真话', () => {
+  const ev = [
+    事件('user/message', 'user', '宝宝我想吃火锅' + 换行 + 'Current runtime context. 后面这些是环境'),
+  ]
+  assert.equal(模.清掉注入上下文(模.挑这一轮的真话(ev)).trim(), '宝宝我想吃火锅')
+})
+
+// ⭐ 1.4.4：老召回记录里混着机器文本的那批 —— 加载时清掉，别白占 100 条上限
+test('认得出老的记忆提醒残渣（`- 3 天前（10-27）：…`）', () => {
+  assert.equal(模.明显是机器写的('- 3 天前（10-27）：提交代码时不许手写作者身份'), true)
+  assert.equal(模.明显是机器写的('- 一直：她这一阵学会了做蛋炒饭'), true)
+  assert.equal(模.明显是机器写的('- 9 天前（10-21）：她决定新书正文全部自己手打'), true)
+})
+
+test('认得出运行环境那几行', () => {
+  assert.equal(模.明显是机器写的('Approval policy: ask. Operations that require approval'), true)
+  assert.equal(模.明显是机器写的('Time sampled while preparing turn 1, step 1: …'), true)
+  assert.equal(模.明显是机器写的('<system-reminder> A skill is …'), true)
+  assert.equal(模.明显是机器写的('[model changed: assistant turns above this point'), true)
+})
+
+test('认得出别的插件塞的提示', () => {
+  assert.equal(模.明显是机器写的('（上面这些是片子里的字幕。）'), true)
+  assert.equal(模.明显是机器写的('（此刻你）心情开心。用这个心情定你这一轮的口气'), true)
+  assert.equal(模.明显是机器写的('（到谷时啦，去 B 站刷一轮吧～'), true)
+})
+
+test('人真的说的话不能误判成机器文本', () => {
+  const 真话 = [
+    '那宝宝，你现在在说说话呢你随便像平时一样说话',
+    '宝宝，你的颜表情呢？',
+    '哎，反正就好烦啊。宝宝，你这次怎么就没怎么多说呢？',
+    '我刚才说 - 那个气泡的问题你改好了没有',
+  ]
+  for (const s of 真话) assert.equal(模.明显是机器写的(s), false, s)
+})
