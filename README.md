@@ -279,7 +279,9 @@ dsh plugin --profile desktop add dsh-fish-memory
 
 ## 许可
 
-MIT
+[Yuuyuko-uu 插件许可 1.0](./LICENSE)：允许使用、修改、商用；
+再分发时要在 README 第一屏注明原仓库和原作者；禁止把本项目说成自己的原创。
+这份许可不是 OSI 认证的开源许可，用之前请读一遍全文。
 
 分词用的词表来自 [jieba](https://github.com/fxsjy/jieba) 的 `extra_dict/dict.txt.small`
 （MIT 协议），只保留了词条本身、去掉了词频和词性两列。
