@@ -81,3 +81,43 @@ test('工作区模式：不同工作区指向不同的库', () => {
 test('工作区模式：认不出工作区的会话退回按会话，不会丢记忆', () => {
   assert.equal(api.库名('根本不存在的会话', { 模式: 'workspace' }), '根本不存在的会话')
 })
+
+// ⭐ 合并：把几间会话的记忆并成一份（切成按工作区之前那一步）
+test('合并：按正文去重，只留一条', () => {
+  const r = api.合并工作区记忆([
+    { 会话: 'a', 记忆: [{ id: '1', text: '她爱吃面', at: '2026-10-01T00:00:00Z' }] },
+    { 会话: 'b', 记忆: [{ id: '2', text: '她爱吃面', at: '2026-10-02T00:00:00Z' }, { id: '3', text: '她怕冷' }] },
+  ])
+  assert.equal(r.合计, 3)
+  assert.equal(r.去重, 1)
+  assert.equal(r.记忆.length, 2)
+  assert.deepEqual(r.记忆.map((m) => m.text).sort(), ['她怕冷', '她爱吃面'])
+})
+
+test('合并：重复时时间取较早的那个', () => {
+  const r = api.合并工作区记忆([
+    { 会话: 'a', 记忆: [{ id: '1', text: '同一件事', at: '2026-10-05T00:00:00Z' }] },
+    { 会话: 'b', 记忆: [{ id: '2', text: '同一件事', at: '2026-10-01T00:00:00Z' }] },
+  ])
+  assert.equal(r.记忆.length, 1)
+  assert.equal(r.记忆[0].at, '2026-10-01T00:00:00Z')
+})
+
+test('合并：id 撞了要换新的，不能两条共用一个 id', () => {
+  const r = api.合并工作区记忆([
+    { 会话: 'a', 记忆: [{ id: 'same', text: '甲' }] },
+    { 会话: 'b', 记忆: [{ id: 'same', text: '乙' }] },
+  ])
+  assert.equal(r.记忆.length, 2)
+  assert.notEqual(r.记忆[0].id, r.记忆[1].id)
+})
+
+test('合并：空正文的不算，明细能对上账', () => {
+  const r = api.合并工作区记忆([
+    { 会话: 'a', 记忆: [{ id: '1', text: '' }, { id: '2', text: '有内容' }] },
+    { 会话: 'b', 记忆: [] },
+  ])
+  assert.equal(r.合计, 1)
+  assert.equal(r.记忆.length, 1)
+  assert.equal(r.明细.length, 2)
+})
