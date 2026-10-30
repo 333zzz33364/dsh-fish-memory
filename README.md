@@ -49,15 +49,16 @@
 在 DSH 里：**设置 → 插件 → 安装**，填下面这一行；或者命令行：
 
 ```
-github:Yuuyuko-uu/dsh-fish-memory
+dsh-fish-memory
 ```
 
 ```sh
-dsh plugin --profile web add github:Yuuyuko-uu/dsh-fish-memory
+dsh plugin --profile web add dsh-fish-memory
 ```
 
-> ⚠ 上面这行会让包管理器去 **clone 仓库**，机器上没装 `git` 会报 `ERR_PNPM_GIT_FETCH_FAILED`。
-> 没 git 就用下面这条 **tarball 直链**，一样能装，不用 git：
+> 也可以在 npm 上直接看到这个包（含历史版本）：<https://www.npmjs.com/package/dsh-fish-memory>
+
+> 上面那条要是碰到网络问题（npm 抽风、或者想固定某一次的代码快照），可以改用 tarball 直链，不用 git：
 
 ```bash
 dsh plugin --profile web add https://codeload.github.com/Yuuyuko-uu/dsh-fish-memory/tar.gz/refs/heads/main
@@ -70,8 +71,7 @@ dsh plugin --profile web add https://codeload.github.com/Yuuyuko-uu/dsh-fish-mem
 
 重启后，打开 **设置 → 鱼的记忆**。
 
-> 还没上 npm，所以**要用上面那条 GitHub 的**。
-> （以后要是上了 npm，`dsh plugin add dsh-fish-memory` 也能用。）
+> 也可以直接装 npm 包：`dsh plugin add dsh-fish-memory`。
 > ⭐ 最省事的一条：把仓库链接贴给你自己的 DSH，说「**帮我装这个插件**」。
 
 ### 装完起不来？先看这个
@@ -122,7 +122,7 @@ $p = "把上面 BOM=True 那一行的路径粘到这里"
 
 ```bash
 dsh plugin --profile desktop remove dsh-fish-memory
-dsh plugin --profile desktop add github:Yuuyuko-uu/dsh-fish-memory
+dsh plugin --profile desktop add dsh-fish-memory
 ```
 
 > ⚠️ **必须先卸再装**：直接装可能拿到缓存里的旧副本，装完还是老的。
