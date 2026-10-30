@@ -56,6 +56,14 @@ github:Yuuyuko-uu/dsh-fish-memory
 dsh plugin --profile web add github:Yuuyuko-uu/dsh-fish-memory
 ```
 
+> ⚠ 上面这行会让包管理器去 **clone 仓库**，机器上没装 `git` 会报 `ERR_PNPM_GIT_FETCH_FAILED`。
+> 没 git 就用下面这条 **tarball 直链**，一样能装，不用 git：
+
+```bash
+dsh plugin --profile web add https://codeload.github.com/Yuuyuko-uu/dsh-fish-memory/tar.gz/refs/heads/main
+```
+
+
 （`--profile` 照你平时那个写：网页端一般 `web`，桌面端一般 `desktop`。）
 
 装完**重启一次 DSH**。
